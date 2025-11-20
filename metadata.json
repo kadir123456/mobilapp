@@ -1,0 +1,5 @@
+{
+  "name": "Futbol Analiz Uzmanı",
+  "description": "Yapay zeka destekli futbol müsabaka analiz uygulaması. Maç bülteninizin fotoğrafını yükleyin, bahis türünü seçin ve geçmiş istatistiklere dayalı derinlemesine analizler ve tahminler alın.",
+  "requestFramePermissions": []
+}
