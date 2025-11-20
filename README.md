@@ -7,7 +7,7 @@ Bu proje, kullanıcıların futbol maçı bültenlerinin görsellerini yükleyer
 - **Hibrit Analiz Motoru:** Google Gemini ile görselden maç tespiti ve `api-football.com`'dan çekilen canlı verilerin yine Gemini ile yorumlanması.
 - **Kullanıcı Yönetimi:** Firebase Authentication ile güvenli kayıt olma ve giriş yapma.
 - **Kredi Sistemi:** Kullanıcıların analiz yapabilmesi için kredi sistemi.
-- **Ödeme Entegrasyonu:** Shopier ile otomatik kredi satışı (Frontend + Backend Callback).
+- **Ödeme Entegrasyonu:** Shopier ile otomatik kredi satışı (Frontend + Güvenli Backend Callback).
 - **Analiz Geçmişi:** Yapılan tüm analizlerin kullanıcıya özel olarak saklanması ve görüntülenebilmesi.
 - **Mobil Uyumlu Arayüz:** Tüm cihazlarda sorunsuz çalışan modern ve kullanıcı dostu tasarım.
 - **Render.com Uyumlu:** Frontend ve Backend servisleri, Render.com üzerinde kolayca dağıtılabilecek şekilde yapılandırılmıştır.
@@ -102,6 +102,9 @@ VITE_FOOTBALL_API_KEY="your_api_football_key"
 ```
 # Firebase Proje Ayarları > Hizmet Hesapları'ndan oluşturulan JSON dosyasının tek satırlık hali
 FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "...", ...}'
+
+# Shopier Panelinizdeki API Bilgileri bölümünden alacağınız API KULLANICI ADI
+SHOPIER_API_USER="your_shopier_api_user"
 
 # Sunucunun çalışacağı port (Render.com otomatik ayarlar)
 # PORT=3001

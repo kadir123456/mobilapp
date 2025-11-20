@@ -36,18 +36,16 @@ const PRICE_TO_CREDITS = {
 // Shopier Callback Endpoint'i
 app.post('/api/shopier/callback', async (req, res) => {
     // Shopier'dan gelen verileri al
-    const { platform_order_id, status, total_order_value, buyer_email, custom_data } = req.body;
+    const { platform_order_id, status, total_order_value, buyer_email, API_key } = req.body;
     
     console.log('Shopier callback received:', req.body);
 
-    // GÜVENLİK: Shopier panelinizden alacağınız bir API anahtarı veya
-    // gizli bir anahtar ile isteğin gerçekten Shopier'dan geldiğini doğrulayın.
-    // Bu örnekte basit bir kontrol yapıyoruz.
-    // const shopierApiKey = req.headers['x-shopier-api-key'];
-    // if (shopierApiKey !== process.env.SHOPIER_API_SECRET) {
-    //     console.error('Invalid Shopier API Key');
-    //     return res.status(401).send('Unauthorized');
-    // }
+    // GÜVENLİK: İsteğin gerçekten Shopier'dan geldiğini doğrula.
+    // Bu, sahte ödeme bildirimlerini engelleyerek sistemi güvende tutar.
+    if (API_key !== process.env.SHOPIER_API_USER) {
+        console.error(`Invalid Shopier API Key. Request from IP: ${req.ip}`);
+        return res.status(401).send('Unauthorized');
+    }
     
     // 1. Ödeme başarılı mı kontrol et (status=1 başarılı demektir)
     if (status !== '1') {
@@ -57,7 +55,7 @@ app.post('/api/shopier/callback', async (req, res) => {
     }
 
     // 2. Fiyata göre kredi miktarını belirle
-    const amount = total_order_value;
+    const amount = String(total_order_value);
     const creditsToAdd = PRICE_TO_CREDITS[amount];
 
     if (!creditsToAdd) {

@@ -5,11 +5,11 @@ import {
   signOut,
   onAuthStateChanged,
   type User
-} from "firebase/auth.js";
+} from "firebase/auth";
 import { 
   doc, setDoc, getDoc, serverTimestamp, collection, addDoc, 
   query, getDocs, orderBy, runTransaction, increment 
-} from "firebase/firestore.js";
+} from "firebase/firestore";
 import { auth, db } from './config';
 import type { MatchAnalysis, BetType, AnalysisHistoryItem } from '../types';
 

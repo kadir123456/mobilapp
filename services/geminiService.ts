@@ -2,7 +2,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { MatchAnalysis, BetType, StructuredMatchData } from "../types";
 
 // Gemini API anahtarı artık merkezi ortam değişkenlerinden okunuyor.
-const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
+// FIX: Per @google/genai guidelines, the API key must be obtained from process.env.API_KEY.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const matchListSchema = {
   type: Type.OBJECT,

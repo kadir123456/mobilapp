@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app.js";
-import { getAuth } from "firebase/auth.js";
-import { getFirestore } from "firebase/firestore.js";
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Firebase yapılandırması ortam değişkenlerinden (environment variables) okunur.
 // Bu, anahtarların kaynak kodunda olmasını engeller ve güvenliği artırır.

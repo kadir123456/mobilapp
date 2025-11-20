@@ -1,4 +1,4 @@
-import type { Timestamp } from 'firebase/firestore.js';
+import type { Timestamp } from 'firebase/firestore';
 
 export interface MatchAnalysis {
   match: string;
