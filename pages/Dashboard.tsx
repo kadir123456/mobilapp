@@ -7,7 +7,7 @@ import ImageUploader from '../components/ImageUploader';
 import BetTypeSelector from '../components/BetTypeSelector';
 import AnalysisResultCard from '../components/AnalysisResultCard';
 import Loader from '../components/Loader';
-import ShopierPaymentModal from '../components/ShopierPaymentModal';
+import GooglePlayPaymentModal from '../components/GooglePlayPaymentModal';
 import HistoryModal from '../components/HistoryModal';
 import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { WalletIcon } from '../components/icons/WalletIcon';
@@ -216,7 +216,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onOpenPrivacyPolicy }) => {
         </div>
       </div>
 
-      <ShopierPaymentModal 
+      <GooglePlayPaymentModal 
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
       />

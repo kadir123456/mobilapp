@@ -1,102 +1,156 @@
-// Gerekli kütüphaneleri import et
+// backend/server.js
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
+const { google } = require('googleapis');
 
-// Ortam değişkenlerini yüklemek için (Render.com'da bu satıra gerek yok)
 require('dotenv').config();
 
 // Firebase Admin SDK'sını başlat
-// Render.com'da bu bilgiyi tek satırlık bir environment variable olarak gireceğiz.
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
-const auth = admin.auth();
-
-// Express uygulamasını oluştur
 const app = express();
 
-// Gelen isteklerin JSON formatında olmasını ve URL-encoded olmasını sağla
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors()); // Farklı domain'lerden gelen istekler için
+app.use(cors());
 
-// Fiyatlara karşılık gelen kredi miktarları (Frontend ile aynı olmalı!)
-const PRICE_TO_CREDITS = {
-    '150': 10,
-    '300': 25,
-    '600': 60,
-    '1200': 150
+// SKU'dan kredi miktarını bul
+const SKU_TO_CREDITS = {
+    'futbol_analiz_10_credits': 10,
+    'futbol_analiz_25_credits': 25,
+    'futbol_analiz_60_credits': 60,
+    'futbol_analiz_150_credits': 150
 };
 
-// Shopier Callback Endpoint'i
-app.post('/api/shopier/callback', async (req, res) => {
-    // Shopier'dan gelen verileri al
-    const { platform_order_id, status, total_order_value, buyer_email, API_key } = req.body;
+// Google Play Developer API Client oluştur
+const getGooglePlayClient = () => {
+    const auth = new google.auth.GoogleAuth({
+        credentials: JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON),
+        scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    });
     
-    console.log('Shopier callback received:', req.body);
+    return google.androidpublisher({
+        version: 'v3',
+        auth: auth,
+    });
+};
 
-    // GÜVENLİK: İsteğin gerçekten Shopier'dan geldiğini doğrula.
-    // Bu, sahte ödeme bildirimlerini engelleyerek sistemi güvende tutar.
-    if (API_key !== process.env.SHOPIER_API_USER) {
-        console.error(`Invalid Shopier API Key. Request from IP: ${req.ip}`);
-        return res.status(401).send('Unauthorized');
-    }
+// Google Play satın alma doğrulama endpoint'i
+app.post('/api/googleplay/verify', async (req, res) => {
+    const { purchaseToken, productId, userId, userEmail } = req.body;
     
-    // 1. Ödeme başarılı mı kontrol et (status=1 başarılı demektir)
-    if (status !== '1') {
-        console.log(`Ödeme başarısız veya beklemede. Sipariş ID: ${platform_order_id}, Durum: ${status}`);
-        // Shopier'a isteği aldığımızı bildiriyoruz ki tekrar göndermesin.
-        return res.status(200).send('OK');
-    }
+    console.log('Google Play doğrulama isteği:', { productId, userId });
 
-    // 2. Fiyata göre kredi miktarını belirle
-    const amount = String(total_order_value);
-    const creditsToAdd = PRICE_TO_CREDITS[amount];
-
-    if (!creditsToAdd) {
-        console.error(`Geçersiz veya bilinmeyen bir fiyat geldi: ${amount}. Sipariş ID: ${platform_order_id}`);
-        return res.status(200).send('OK');
+    // Gerekli alanları kontrol et
+    if (!purchaseToken || !productId || !userId) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Eksik parametreler' 
+        });
     }
 
     try {
-        // 3. E-posta adresinden Firebase kullanıcısını bul
-        const userRecord = await auth.getUserByEmail(buyer_email);
-        const userId = userRecord.uid;
-        const userRef = db.collection('users').doc(userId);
+        // 1. Google Play'den satın almayı doğrula
+        const androidPublisher = getGooglePlayClient();
+        const packageName = process.env.ANDROID_PACKAGE_NAME; // com.yourcompany.futbolanaliz
+        
+        const purchase = await androidPublisher.purchases.products.get({
+            packageName: packageName,
+            productId: productId,
+            token: purchaseToken,
+        });
 
-        // 4. Firestore Transaction ile krediyi güvenli bir şekilde ekle
-        // Bu, aynı isteğin iki kez işlenmesi gibi durumları engeller.
+        const purchaseData = purchase.data;
+        
+        // 2. Satın alma durumunu kontrol et
+        // purchaseState: 0 = satın alındı, 1 = iptal edildi
+        if (purchaseData.purchaseState !== 0) {
+            console.log('Satın alma geçerli değil:', purchaseData.purchaseState);
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Satın alma geçerli değil' 
+            });
+        }
+
+        // 3. Satın alma daha önce kullanıldı mı kontrol et
+        const purchaseRef = db.collection('purchases').doc(purchaseToken);
+        const purchaseDoc = await purchaseRef.get();
+        
+        if (purchaseDoc.exists) {
+            console.log('Bu satın alma daha önce kullanıldı');
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Bu satın alma zaten kullanıldı' 
+            });
+        }
+
+        // 4. Kredi miktarını belirle
+        const creditsToAdd = SKU_TO_CREDITS[productId];
+        if (!creditsToAdd) {
+            console.error('Geçersiz ürün ID:', productId);
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Geçersiz ürün' 
+            });
+        }
+
+        // 5. Firestore Transaction ile krediyi ekle
+        const userRef = db.collection('users').doc(userId);
+        
         await db.runTransaction(async (transaction) => {
             const userDoc = await transaction.get(userRef);
+            
             if (!userDoc.exists) {
-                throw new Error(`Kullanıcı bulunamadı: ${buyer_email}`);
+                throw new Error('Kullanıcı bulunamadı');
             }
 
             const currentCredits = userDoc.data().credits || 0;
             const newCredits = currentCredits + creditsToAdd;
             
-            transaction.update(userRef, { credits: newCredits });
+            // Kullanıcıya kredi ekle
+            transaction.update(userRef, { 
+                credits: newCredits,
+                lastPurchaseDate: admin.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Satın almayı kaydet (tekrar kullanımı önlemek için)
+            transaction.set(purchaseRef, {
+                userId,
+                userEmail,
+                productId,
+                creditsAdded: creditsToAdd,
+                purchaseDate: admin.firestore.FieldValue.serverTimestamp(),
+                orderId: purchaseData.orderId
+            });
         });
 
-        console.log(`Başarılı: ${creditsToAdd} kredi, ${buyer_email} adlı kullanıcıya eklendi.`);
+        console.log(`Başarılı: ${creditsToAdd} kredi, ${userId} kullanıcısına eklendi`);
         
-        // 5. Shopier'a her şeyin yolunda olduğunu bildir.
-        res.status(200).send('OK');
+        res.json({ 
+            success: true, 
+            credits: creditsToAdd,
+            message: 'Krediler başarıyla eklendi'
+        });
 
     } catch (error) {
-        console.error(`Shopier callback işlenirken hata oluştu. Sipariş ID: ${platform_order_id}`, error);
-        // Hata olsa bile Shopier'a 200 OK gönderiyoruz ki aynı isteği tekrar tekrar göndermeye çalışmasın.
-        // Hataları manuel olarak log'lardan takip edip çözmemiz gerekir.
-        res.status(200).send('OK');
+        console.error('Google Play doğrulama hatası:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Doğrulama başarısız',
+            details: error.message 
+        });
     }
 });
 
-// Sunucuyu dinlemeye başla
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Backend server ${PORT} portunda çalışıyor...`);
